@@ -34,11 +34,11 @@ def split_data(parent_folder, csv_path, split_val=0.1, split_test=0.1):
 def data_generators(batch_size,train_data_path,val_data_path,test_data_path):
   preprocessor = tf.keras.preprocessing.image.ImageDataGenerator(
     rescale=1./255,
-    #rotation_range=15,     
+    rotation_range=8,     
     #width_shift_range=0.1,  
     #height_shift_range=0.1, 
     #shear_range=0.1,   
-    zoom_range=0.1
+    zoom_range=0.15
   )
   test_preprocessor = tf.keras.preprocessing.image.ImageDataGenerator(
     rescale = 1/255.
