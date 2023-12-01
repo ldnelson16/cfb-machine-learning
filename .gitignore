@@ -1,5 +1,6 @@
 *.png
 *__pycache__
 */Models
+*Models
 */SaveModel
 *.h5
