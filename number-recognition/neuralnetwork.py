@@ -3,6 +3,7 @@ import tensorflow as tf
 import os, random
 import numpy as np
 from image_sorter import data_generators
+from image_sorter import split_data
 from PIL import Image, ImageDraw, ImageFont
 
 def nn(num_classes):
@@ -48,33 +49,36 @@ def predict(model,image_path):
 
 if __name__=="__main__":
   ### SWITCHES
+  SPLIT = False
   TRAIN = False
-  TEST = False
+  TEST = True
   PREDICT = True
+
+  if SPLIT:
+    split_data("number-recognition/","number-recognition/train_player_numbers.csv",NOTMOVED = False)
 
   ### DATA GENERATION / PIPELINE
   batch_size = 64 
-  train_data,val_data,test_data = data_generators(batch_size,os.path.join(os.getcwd(),"number-recognition","train"),os.path.join(os.getcwd(),"number-recognition","val"),os.path.join(os.getcwd(),"number-recognition","test"))
+  train_data,val_data,test_data = data_generators(batch_size,sideline=False,endzone=True)
   nbr_classes = train_data.num_classes
 
   class_index_to_label = {v: k for k, v in train_data.class_indices.items()} # conversion for innacurate class numbering
 
-  ### SAVING MODEL AND ENABLING EARLY STOPPING
-  path_to_save_model = "./number-recognition/Models"
-  ckptsaver = tf.keras.callbacks.ModelCheckpoint(
-    path_to_save_model,
-    monitor="val_accuracy",
-    mode="max",
-    save_best_only=True,
-    save_freq="epoch",
-    verbose=1
-  )
-  early_stop = tf.keras.callbacks.EarlyStopping(
-    monitor="val_accuracy",
-    patience=10
-  )
-
   if TRAIN:
+    ### SAVING MODEL AND ENABLING EARLY STOPPING
+    path_to_save_model = "./number-recognition/EndZoneModels"
+    ckptsaver = tf.keras.callbacks.ModelCheckpoint(
+      path_to_save_model,
+      monitor="val_accuracy",
+      mode="max",
+      save_best_only=True,
+      save_freq="epoch",
+      verbose=1
+    )
+    early_stop = tf.keras.callbacks.EarlyStopping(
+      monitor="val_accuracy",
+      patience=10
+    )
     ### CREATING TF MODEL
     num_epochs = 100
     model = nn(nbr_classes)
@@ -101,7 +105,7 @@ if __name__=="__main__":
 
   if TEST:
     ### IMPORT MODEL
-    model = tf.keras.models.load_model("./number-recognition/Models")
+    model = tf.keras.models.load_model("./number-recognition/EndzoneModels")
     model.summary()
 
     ### EVALUATE ACCURACY BASED ON VAL / TEST
@@ -112,22 +116,22 @@ if __name__=="__main__":
 
   if PREDICT:
     ### MAKING RANDOMIZED PREDICTIONS
-    model = tf.keras.models.load_model("./number-recognition/Models")
+    model = tf.keras.models.load_model("./number-recognition/EndzoneModels")
     correct=0
     amt=0
     confidences=[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
     top_images_count = 100
     top_images_info = []
     for i in range(1,100):
-      test_path = os.path.join(os.getcwd(),"number-recognition","test")
+      test_path = os.path.join(os.getcwd(),"number-recognition","endzone-test")
       folder_path = os.path.join(test_path, str(i))
       filenames = os.listdir(folder_path)
       if filenames:
-        num_files_to_select = min(30, len(filenames))
+        num_files_to_select = min(25, len(filenames))
         random_filenames = random.sample(filenames, num_files_to_select)
         amt+=len(random_filenames)
         for random_filename in random_filenames:
-          img_for_prediction_path = os.path.join(os.getcwd(),"number-recognition","test",str(i),random_filename)
+          img_for_prediction_path = os.path.join(os.getcwd(),"number-recognition","endzone-test",str(i),random_filename)
           prediction,class_predicted = predict(model, img_for_prediction_path)
           confidence = round(100*np.max(prediction),3)
           confind = int(round(100*np.max(prediction),3))//10
@@ -166,7 +170,7 @@ if __name__=="__main__":
     font = ImageFont.load_default()
 
     for idx, info in enumerate(top_images_info):
-      img_path = os.path.join(os.getcwd(), "number-recognition", "test", str(info['true_class']), info['filename'])
+      img_path = os.path.join(os.getcwd(), "number-recognition", "endzone-test", str(info['true_class']), info['filename'])
       img = Image.open(img_path)
       
       # Calculate position for pasting the image
@@ -175,27 +179,17 @@ if __name__=="__main__":
       paste_x = col * (collage_width // 10)
       paste_y = row * (collage_height // 10)
       
-      # Convert RGB image to HSV
-      img_hsv = img.convert('HSV')
-      
-      # Extract hue, saturation, and value channels
-      h, s, v = img_hsv.split()
-      
-      # Set the desired hue (0.5 corresponds to green, 0.0 to red)
-      hue_adjustment = 0.5 if info['predicted_class'] == info['true_class'] else 0.0
-      h = h.point(lambda i: i * hue_adjustment)
-      
-      # Merge the channels back together
-      img_hue_adjusted = Image.merge('HSV', (h, s, v)).convert('RGB')
-      
       # Paste the hue-adjusted image onto the collage
-      collage.paste(img_hue_adjusted, (paste_x, paste_y))
+      collage.paste(img, (paste_x, paste_y))
       
       text = f"Pred: {info['predicted_class']}"
-      text_position = (paste_x + 30, paste_y + 80)
-      draw.text(text_position, text, font=font, fill=(0, 0, 0))
+      text_position = (paste_x + 10, paste_y + 50)
+      if info['predicted_class']==info['true_class']:
+        draw.text(text_position, text, font=font, fill=(0, 255, 0))
+      else:
+        draw.text(text_position, text, font=font, fill=(255, 0, 0))
 
-    collage.save('top_images_collage.png')
+    collage.save('top_images_collage_endzone.png')
 
     ### MAKING SPECIFIC PREDICTIONS
     
